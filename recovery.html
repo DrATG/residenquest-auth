@@ -21,7 +21,7 @@
     .err { background:#ffebee; color:#b71c1c; }
   </style>
 
-  <!-- ✅ Pin to a known-good UMD build -->
+  <!-- Pin to a known-good UMD build -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
 </head>
 <body>
@@ -46,7 +46,7 @@
 
   <script>
     const SUPABASE_URL = "https://hfknqqsnzmvixvodgkpm.supabase.co";
-    // ✅ Your publishable key is fine here
+    // Your publishable key is fine here
     const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_euRrSBnYzneBY0qLrBI2ow_forlipav";
 
     const statusEl = document.getElementById("status");
@@ -58,12 +58,15 @@
       statusEl.textContent = text;
     }
 
-    // Make failures visible on-page (not just console)
+    // Helpful, but do not rely on these as the only error UX
     window.addEventListener("error", (e) => {
       showStatus("err", "JS error: " + (e.message || e.error));
     });
     window.addEventListener("unhandledrejection", (e) => {
-      showStatus("err", "Promise error: " + (e.reason?.message || e.reason));
+      const msg =
+        (e?.reason && (e.reason.message || e.reason.error_description || e.reason.error)) ||
+        String(e.reason);
+      showStatus("err", "Error: " + msg);
     });
 
     if (!window.supabase?.createClient) {
@@ -71,10 +74,10 @@
       btnEl.disabled = true;
     }
 
-    // ✅ Avoid global name collision: use `sb` not `supabase`
+    // Avoid global name collision: use `sb` not `supabase`
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
       auth: {
-        persistSession: false,     // helps with tracking-prevention storage warnings
+        persistSession: false,
         autoRefreshToken: false,
         detectSessionInUrl: false,
       }
@@ -114,12 +117,37 @@
       throw new Error("No se encontró sesión en el enlace. Abre este link desde el correo de recuperación.");
     }
 
+    function friendlySupabaseError(err) {
+      const raw =
+        (err && (err.message || err.error_description || err.error))
+          ? (err.message || err.error_description || err.error)
+          : String(err);
+
+      const m = raw.toLowerCase();
+
+      // Messages can vary across Supabase/Auth versions, so match broadly.
+      if (m.includes("same password") || (m.includes("different") && m.includes("password"))) {
+        return "La nueva contraseña debe ser diferente a la anterior.";
+      }
+      if (m.includes("password") && (m.includes("least") || m.includes("short") || m.includes("8"))) {
+        return "La contraseña debe tener al menos 8 caracteres.";
+      }
+      if (m.includes("expired") || (m.includes("invalid") && m.includes("token"))) {
+        return "El enlace de recuperación expiró. Solicita uno nuevo desde la app.";
+      }
+
+      return "No se pudo actualizar la contraseña. Intenta de nuevo.";
+    }
+
     async function resetPassword() {
+      const originalText = btnEl.textContent;
       btnEl.disabled = true;
+      btnEl.textContent = "Guardando…";
 
       try {
-        const pw1 = document.getElementById("pw1").value.trim();
-        const pw2 = document.getElementById("pw2").value.trim();
+        // Do NOT trim passwords (spaces can be valid characters)
+        const pw1 = document.getElementById("pw1").value;
+        const pw2 = document.getElementById("pw2").value;
 
         if (!pw1 || !pw2) {
           showStatus("err", "Por favor completa ambos campos.");
@@ -140,8 +168,11 @@
         if (error) throw error;
 
         showStatus("ok", "✅ Contraseña actualizada. Ya puedes volver a la app e iniciar sesión.");
+      } catch (err) {
+        showStatus("err", friendlySupabaseError(err));
       } finally {
         btnEl.disabled = false;
+        btnEl.textContent = originalText;
       }
     }
 
