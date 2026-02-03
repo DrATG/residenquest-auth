@@ -28,14 +28,38 @@
 
   <script>
     function send(msg) {
-      // Flutter WebView JS channel
+      // webview_flutter JavaScriptChannel
       if (window.Captcha && window.Captcha.postMessage) {
-        window.Captcha.postMessage(msg);
+        window.Captcha.postMessage(String(msg));
       }
     }
-    function onSuccess(token) { send(token); }
-    function onError() { send("ERROR"); }
-    function onExpired() { send("EXPIRED"); }
+
+    function goDone(fragment) {
+      // Token is stored in URL fragment (#...), not sent to the server.
+      // This lets Windows WebView2 capture it via URL changes.
+      window.location.replace('captcha_done.html#' + fragment);
+    }
+
+    function onSuccess(token) {
+      const t = (token || '').trim();
+      if (!t) {
+        send("ERROR");
+        goDone("error=EMPTY");
+        return;
+      }
+      send(t);
+      goDone("token=" + encodeURIComponent(t));
+    }
+
+    function onError() {
+      send("ERROR");
+      goDone("error=ERROR");
+    }
+
+    function onExpired() {
+      send("EXPIRED");
+      goDone("error=EXPIRED");
+    }
   </script>
 </body>
 </html>
