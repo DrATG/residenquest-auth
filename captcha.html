@@ -27,38 +27,47 @@
   </div>
 
   <script>
+    function hasFlutterChannel() {
+      return !!(window.Captcha && window.Captcha.postMessage);
+    }
+
     function send(msg) {
-      // webview_flutter JavaScriptChannel
-      if (window.Captcha && window.Captcha.postMessage) {
+      if (hasFlutterChannel()) {
         window.Captcha.postMessage(String(msg));
       }
     }
 
     function goDone(fragment) {
-      // Token is stored in URL fragment (#...), not sent to the server.
-      // This lets Windows WebView2 capture it via URL changes.
+      // Token/error is placed in URL fragment (#...), not sent to the server.
       window.location.replace('captcha_done.html#' + fragment);
+    }
+
+    function sendWithFallback(msg, fragment) {
+      // Always try the JS channel first (fast on Android/iOS/mac).
+      send(msg);
+
+      // Fallback for platforms where JS channel is missing (Windows WebView2),
+      // or if the channel fails silently.
+      setTimeout(function() {
+        goDone(fragment);
+      }, 350);
     }
 
     function onSuccess(token) {
       const t = (token || '').trim();
       if (!t) {
-        send("ERROR");
-        goDone("error=EMPTY");
+        sendWithFallback("ERROR", "error=EMPTY");
         return;
       }
-      send(t);
-      goDone("token=" + encodeURIComponent(t));
+      sendWithFallback(t, "token=" + encodeURIComponent(t));
     }
 
     function onError() {
-      send("ERROR");
-      goDone("error=ERROR");
+      sendWithFallback("ERROR", "error=ERROR");
     }
 
     function onExpired() {
-      send("EXPIRED");
-      goDone("error=EXPIRED");
+      sendWithFallback("EXPIRED", "error=EXPIRED");
     }
   </script>
 </body>
