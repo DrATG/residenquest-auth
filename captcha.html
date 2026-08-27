@@ -37,37 +37,23 @@
       }
     }
 
-    function goDone(fragment) {
-      // Token/error is placed in URL fragment (#...), not sent to the server.
-      window.location.replace('captcha_done.html#' + fragment);
-    }
-
-    function sendWithFallback(msg, fragment) {
-      // Always try the JS channel first (fast on Android/iOS/mac).
-      send(msg);
-
-      // Fallback for platforms where JS channel is missing (Windows WebView2),
-      // or if the channel fails silently.
-      setTimeout(function() {
-        goDone(fragment);
-      }, 350);
-    }
-
     function onSuccess(token) {
       const t = (token || '').trim();
+
       if (!t) {
-        sendWithFallback("ERROR", "error=EMPTY");
+        send("ERROR");
         return;
       }
-      sendWithFallback(t, "token=" + encodeURIComponent(t));
+
+      send(t);
     }
 
     function onError() {
-      sendWithFallback("ERROR", "error=ERROR");
+      send("ERROR");
     }
 
     function onExpired() {
-      sendWithFallback("EXPIRED", "error=EXPIRED");
+      send("EXPIRED");
     }
   </script>
 </body>
