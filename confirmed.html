@@ -18,11 +18,54 @@
 <body>
   <div class="card">
     <div class="title">ResidenQuest</div>
-    <div class="ok">✅ Tu cuenta ha sido confirmada.</div>
-    <div class="hint">
+
+    <div class="ok" id="status">✅ Tu cuenta ha sido confirmada.</div>
+
+    <div class="hint" id="hint">
       Ya puedes volver a la app e iniciar sesión.
     </div>
+
     <a class="btn" href="#" onclick="window.close(); return false;">Cerrar</a>
   </div>
+
+  <script>
+    (() => {
+      const query = new URLSearchParams(window.location.search);
+
+      const hashText = window.location.hash.startsWith('#')
+        ? window.location.hash.substring(1)
+        : window.location.hash;
+
+      const hash = new URLSearchParams(hashText);
+
+      const error =
+        query.get('error') ||
+        hash.get('error') ||
+        query.get('error_code') ||
+        hash.get('error_code');
+
+      const errorDescription =
+        query.get('error_description') ||
+        hash.get('error_description');
+
+      const status = document.getElementById('status');
+      const hint = document.getElementById('hint');
+
+      if (error || errorDescription) {
+        status.textContent = '❌ No se pudo confirmar tu cuenta.';
+        hint.textContent =
+          'El enlace puede haber expirado o ya no ser válido. Vuelve a la app e intenta nuevamente.';
+      }
+
+      // Remove tokens/error details from the visible URL/history.
+      if (window.history.replaceState) {
+        window.history.replaceState(
+          null,
+          document.title,
+          window.location.pathname
+        );
+      }
+    })();
+  </script>
 </body>
 </html>
