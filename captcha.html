@@ -9,24 +9,46 @@
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 
   <style>
-    body { margin:0; font-family: Arial, sans-serif; background: transparent; }
-    .wrap { display:flex; align-items:center; justify-content:center; height:100vh; }
-    .hint { color:#666; font-size:14px; }
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: transparent;
+    }
+
+    .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    .hint {
+      color: #666;
+      font-size: 14px;
+    }
   </style>
 </head>
+
 <body>
   <div class="wrap">
     <div class="hint">Verificando…</div>
-    <div class="cf-turnstile"
-         data-sitekey="0x4AAAAAACNJalFqU3pVBzT2"
-         data-callback="onSuccess"
-         data-error-callback="onError"
-         data-expired-callback="onExpired"
-         data-timeout-callback="onError"
-         data-size="invisible"></div>
+
+    <div
+      class="cf-turnstile"
+      data-sitekey="0x4AAAAAACNJalFqU3pVBzT2"
+      data-callback="onSuccess"
+      data-error-callback="onError"
+      data-expired-callback="onExpired"
+      data-timeout-callback="onError"
+      data-retry="never"
+      data-refresh-expired="never">
+    </div>
   </div>
 
   <script>
+    let completed = false;
+    let watchdogId = null;
+
     function hasFlutterChannel() {
       return !!(window.Captcha && window.Captcha.postMessage);
     }
@@ -37,24 +59,42 @@
       }
     }
 
+    function complete(msg) {
+      if (completed) {
+        return;
+      }
+
+      completed = true;
+
+      if (watchdogId !== null) {
+        window.clearTimeout(watchdogId);
+      }
+
+      send(msg);
+    }
+
     function onSuccess(token) {
       const t = (token || '').trim();
 
       if (!t) {
-        send("ERROR");
+        complete("ERROR");
         return;
       }
 
-      send(t);
+      complete(t);
     }
 
     function onError() {
-      send("ERROR");
+      complete("ERROR");
     }
 
     function onExpired() {
-      send("EXPIRED");
+      complete("EXPIRED");
     }
+
+    watchdogId = window.setTimeout(function () {
+      complete("ERROR");
+    }, 45000);
   </script>
 </body>
 </html>
