@@ -52,6 +52,11 @@
     const statusEl = document.getElementById("status");
     const btnEl = document.getElementById("btn");
 
+    // Once the recovery session has been successfully established, remember it
+    // for this page lifetime so a retry does not depend on credentials remaining
+    // in the URL.
+    let recoverySessionEstablished = false;
+
     function showStatus(type, text) {
       statusEl.style.display = "block";
       statusEl.className = "msg " + (type === "ok" ? "ok" : "err");
@@ -62,6 +67,7 @@
     window.addEventListener("error", (e) => {
       showStatus("err", "JS error: " + (e.message || e.error));
     });
+
     window.addEventListener("unhandledrejection", (e) => {
       const msg =
         (e?.reason && (e.reason.message || e.reason.error_description || e.reason.error)) ||
@@ -75,16 +81,23 @@
     }
 
     // Avoid global name collision: use `sb` not `supabase`
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-        detectSessionInUrl: false,
+    const sb = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_PUBLISHABLE_KEY,
+      {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false,
+        }
       }
-    });
+    );
 
     function getParams() {
-      const hash = window.location.hash.startsWith("#") ? window.location.hash.substring(1) : "";
+      const hash = window.location.hash.startsWith("#")
+        ? window.location.hash.substring(1)
+        : "";
+
       const hashParams = new URLSearchParams(hash);
       const queryParams = new URLSearchParams(window.location.search);
 
@@ -97,6 +110,12 @@
     }
 
     async function ensureSessionFromLink() {
+      // If the session was already established during a previous attempt on
+      // this page, do not require the recovery tokens to still be in the URL.
+      if (recoverySessionEstablished) {
+        return;
+      }
+
       const p = getParams();
 
       if (p.access_token && p.refresh_token) {
@@ -104,17 +123,35 @@
           access_token: p.access_token,
           refresh_token: p.refresh_token,
         });
+
         if (error) throw error;
+
+        recoverySessionEstablished = true;
         return data.session;
       }
 
       if (p.code) {
         const { data, error } = await sb.auth.exchangeCodeForSession(p.code);
+
         if (error) throw error;
+
+        recoverySessionEstablished = true;
         return data.session;
       }
 
-      throw new Error("No se encontró sesión en el enlace. Abre este link desde el correo de recuperación.");
+      throw new Error(
+        "No se encontró sesión en el enlace. Abre este link desde el correo de recuperación."
+      );
+    }
+
+    function clearRecoveryCredentialsFromUrl() {
+      if (window.history.replaceState) {
+        window.history.replaceState(
+          null,
+          document.title,
+          window.location.pathname
+        );
+      }
     }
 
     function friendlySupabaseError(err) {
@@ -126,13 +163,24 @@
       const m = raw.toLowerCase();
 
       // Messages can vary across Supabase/Auth versions, so match broadly.
-      if (m.includes("same password") || (m.includes("different") && m.includes("password"))) {
+      if (
+        m.includes("same password") ||
+        (m.includes("different") && m.includes("password"))
+      ) {
         return "La nueva contraseña debe ser diferente a la anterior.";
       }
-      if (m.includes("password") && (m.includes("least") || m.includes("short") || m.includes("8"))) {
+
+      if (
+        m.includes("password") &&
+        (m.includes("least") || m.includes("short") || m.includes("8"))
+      ) {
         return "La contraseña debe tener al menos 8 caracteres.";
       }
-      if (m.includes("expired") || (m.includes("invalid") && m.includes("token"))) {
+
+      if (
+        m.includes("expired") ||
+        (m.includes("invalid") && m.includes("token"))
+      ) {
         return "El enlace de recuperación expiró. Solicita uno nuevo desde la app.";
       }
 
@@ -153,10 +201,12 @@
           showStatus("err", "Por favor completa ambos campos.");
           return;
         }
+
         if (pw1.length < 8) {
           showStatus("err", "La contraseña debe tener al menos 8 caracteres.");
           return;
         }
+
         if (pw1 !== pw2) {
           showStatus("err", "Las contraseñas no coinciden.");
           return;
@@ -164,10 +214,21 @@
 
         await ensureSessionFromLink();
 
-        const { error } = await sb.auth.updateUser({ password: pw1 });
+        // The Supabase client now owns the recovery session. Remove the
+        // access/refresh tokens (or PKCE code fallback) from the visible URL
+        // and browser history before updating the password.
+        clearRecoveryCredentialsFromUrl();
+
+        const { error } = await sb.auth.updateUser({
+          password: pw1
+        });
+
         if (error) throw error;
 
-        showStatus("ok", "✅ Contraseña actualizada. Ya puedes volver a la app e iniciar sesión.");
+        showStatus(
+          "ok",
+          "✅ Contraseña actualizada. Ya puedes volver a la app e iniciar sesión."
+        );
       } catch (err) {
         showStatus("err", friendlySupabaseError(err));
       } finally {
@@ -182,8 +243,12 @@
     // Optional: early hint if link type is wrong
     (function () {
       const p = getParams();
+
       if (p.type && p.type !== "recovery") {
-        showStatus("err", "Este enlace no es de recuperación (type=" + p.type + ").");
+        showStatus(
+          "err",
+          "Este enlace no es de recuperación (type=" + p.type + ")."
+        );
       }
     })();
   </script>
