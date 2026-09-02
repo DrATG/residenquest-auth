@@ -28,8 +28,10 @@
 
     .wrap {
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
+      gap: 10px;
       width: 100%;
       height: 100%;
     }
@@ -94,14 +96,36 @@
       complete("ERROR");
     }
 
+    function getTurnstileSize() {
+      return window.innerWidth < 300
+        ? "compact"
+        : "normal";
+    }
+
+    function renderTurnstile() {
+      try {
+        window.turnstile.render("#turnstile-widget", {
+          sitekey: "0x4AAAAAACNJalFqU3pVBzT2",
+          size: getTurnstileSize(),
+          callback: onSuccess,
+          "error-callback": onError,
+          "expired-callback": onExpired,
+          "timeout-callback": onTimeout,
+          retry: "never",
+          "refresh-expired": "never"
+        });
+      } catch (_) {
+        complete("ERROR");
+      }
+    }
+
     watchdogId = window.setTimeout(function () {
       complete("ERROR");
     }, 45000);
   </script>
 
   <script
-    src="https://challenges.cloudflare.com/turnstile/v0/api.js"
-    async
+    src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=renderTurnstile"
     defer>
   </script>
 </head>
@@ -110,16 +134,7 @@
   <div class="wrap">
     <div class="hint">Verificando…</div>
 
-    <div
-      class="cf-turnstile"
-      data-sitekey="0x4AAAAAACNJalFqU3pVBzT2"
-      data-callback="onSuccess"
-      data-error-callback="onError"
-      data-expired-callback="onExpired"
-      data-timeout-callback="onTimeout"
-      data-retry="never"
-      data-refresh-expired="never">
-    </div>
+    <div id="turnstile-widget"></div>
   </div>
 </body>
 </html>
