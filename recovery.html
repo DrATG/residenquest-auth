@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>ResidenQuest - Recuperación</title>
+
   <style>
     body { font-family: Arial, sans-serif; background:#f5f3ff; margin:0; padding:24px; }
     .card { max-width:560px; margin:0 auto; background:#fff; border-radius:18px; padding:22px;
@@ -15,39 +16,60 @@
     input { width:100%; padding:12px; border-radius:12px; border:1px solid #ddd; font-size:15px; }
     button { margin-top:16px; width:100%; padding:12px; border-radius:12px; border:none;
              background:#673ab7; color:#fff; font-weight:900; font-size:16px; cursor:pointer; }
-    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    button:disabled { opacity:0.6; cursor:not-allowed; }
     .msg { margin-top:14px; padding:12px; border-radius:12px; font-size:14px; line-height:1.5; }
     .ok { background:#e8f5e9; color:#1b5e20; }
     .err { background:#ffebee; color:#b71c1c; }
   </style>
 
-  <!-- Pin to a known-good UMD build -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.1/dist/umd/supabase.min.js"></script>
+  <!-- Exact pinned Supabase JS 2.111.0 UMD browser build with SRI -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0/dist/umd/supabase.js"
+    integrity="sha384-faMlYZUtkJj+Sh6Bmu/L0GzPcraRWN6CW+9RH3GUrK/Z0WS9tgaNNt0tHiLxsbdb"
+    crossorigin="anonymous">
+  </script>
 </head>
+
 <body>
   <div class="card">
     <div class="title">ResidenQuest</div>
-    <div class="hint">Establece una nueva contraseña para tu cuenta.</div>
+
+    <div class="hint">
+      Establece una nueva contraseña para tu cuenta.
+    </div>
 
     <div id="status" class="msg" style="display:none;"></div>
 
     <div class="row">
       <label>Nueva contraseña</label>
-      <input id="pw1" type="password" placeholder="Mínimo 8 caracteres" />
+      <input
+        id="pw1"
+        type="password"
+        placeholder="Mínimo 8 caracteres"
+      />
     </div>
 
     <div class="row">
       <label>Confirmar contraseña</label>
-      <input id="pw2" type="password" placeholder="Repite tu contraseña" />
+      <input
+        id="pw2"
+        type="password"
+        placeholder="Repite tu contraseña"
+      />
     </div>
 
-    <button id="btn" type="button">Guardar nueva contraseña</button>
+    <button id="btn" type="button">
+      Guardar nueva contraseña
+    </button>
   </div>
 
   <script>
-    const SUPABASE_URL = "https://hfknqqsnzmvixvodgkpm.supabase.co";
-    // Your publishable key is fine here
-    const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_euRrSBnYzneBY0qLrBI2ow_forlipav";
+    const SUPABASE_URL =
+      "https://hfknqqsnzmvixvodgkpm.supabase.co";
+
+    // Your publishable key is fine here.
+    const SUPABASE_PUBLISHABLE_KEY =
+      "sb_publishable_euRrSBnYzneBY0qLrBI2ow_forlipav";
 
     const statusEl = document.getElementById("status");
     const btnEl = document.getElementById("btn");
@@ -59,52 +81,77 @@
 
     function showStatus(type, text) {
       statusEl.style.display = "block";
-      statusEl.className = "msg " + (type === "ok" ? "ok" : "err");
+      statusEl.className =
+        "msg " + (type === "ok" ? "ok" : "err");
       statusEl.textContent = text;
     }
 
-    // Helpful, but do not rely on these as the only error UX
+    // Helpful, but do not rely on these as the only error UX.
     window.addEventListener("error", (e) => {
-      showStatus("err", "JS error: " + (e.message || e.error));
+      showStatus(
+        "err",
+        "JS error: " + (e.message || e.error)
+      );
     });
 
     window.addEventListener("unhandledrejection", (e) => {
       const msg =
-        (e?.reason && (e.reason.message || e.reason.error_description || e.reason.error)) ||
+        (
+          e?.reason &&
+          (
+            e.reason.message ||
+            e.reason.error_description ||
+            e.reason.error
+          )
+        ) ||
         String(e.reason);
+
       showStatus("err", "Error: " + msg);
     });
 
+    // Create the client only if Supabase JS actually loaded.
+    // This prevents a secondary TypeError if the CDN itself fails
+    // or if the browser rejects the external script because of SRI.
+    let sb = null;
+
     if (!window.supabase?.createClient) {
-      showStatus("err", "No se pudo cargar Supabase JS (CDN). Revisa conexión o el script tag.");
+      showStatus(
+        "err",
+        "No se pudo cargar Supabase JS (CDN). Revisa conexión o el script tag."
+      );
+
       btnEl.disabled = true;
+    } else {
+      // Avoid global name collision: use `sb` not `supabase`.
+      sb = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_PUBLISHABLE_KEY,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          }
+        }
+      );
     }
 
-    // Avoid global name collision: use `sb` not `supabase`
-    const sb = window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_PUBLISHABLE_KEY,
-      {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false,
-        }
-      }
-    );
-
     function getParams() {
-      const hash = window.location.hash.startsWith("#")
-        ? window.location.hash.substring(1)
-        : "";
+      const hash =
+        window.location.hash.startsWith("#")
+          ? window.location.hash.substring(1)
+          : "";
 
       const hashParams = new URLSearchParams(hash);
-      const queryParams = new URLSearchParams(window.location.search);
+      const queryParams =
+        new URLSearchParams(window.location.search);
 
       return {
         access_token: hashParams.get("access_token"),
         refresh_token: hashParams.get("refresh_token"),
-        type: hashParams.get("type") || queryParams.get("type"),
+        type:
+          hashParams.get("type") ||
+          queryParams.get("type"),
         code: queryParams.get("code"),
       };
     }
@@ -116,24 +163,34 @@
         return;
       }
 
+      if (!sb) {
+        throw new Error("Supabase JS no está disponible.");
+      }
+
       const p = getParams();
 
       if (p.access_token && p.refresh_token) {
-        const { data, error } = await sb.auth.setSession({
-          access_token: p.access_token,
-          refresh_token: p.refresh_token,
-        });
+        const { data, error } =
+          await sb.auth.setSession({
+            access_token: p.access_token,
+            refresh_token: p.refresh_token,
+          });
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         recoverySessionEstablished = true;
         return data.session;
       }
 
       if (p.code) {
-        const { data, error } = await sb.auth.exchangeCodeForSession(p.code);
+        const { data, error } =
+          await sb.auth.exchangeCodeForSession(p.code);
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         recoverySessionEstablished = true;
         return data.session;
@@ -156,8 +213,19 @@
 
     function friendlySupabaseError(err) {
       const raw =
-        (err && (err.message || err.error_description || err.error))
-          ? (err.message || err.error_description || err.error)
+        (
+          err &&
+          (
+            err.message ||
+            err.error_description ||
+            err.error
+          )
+        )
+          ? (
+              err.message ||
+              err.error_description ||
+              err.error
+            )
           : String(err);
 
       const m = raw.toLowerCase();
@@ -165,21 +233,31 @@
       // Messages can vary across Supabase/Auth versions, so match broadly.
       if (
         m.includes("same password") ||
-        (m.includes("different") && m.includes("password"))
+        (
+          m.includes("different") &&
+          m.includes("password")
+        )
       ) {
         return "La nueva contraseña debe ser diferente a la anterior.";
       }
 
       if (
         m.includes("password") &&
-        (m.includes("least") || m.includes("short") || m.includes("8"))
+        (
+          m.includes("least") ||
+          m.includes("short") ||
+          m.includes("8")
+        )
       ) {
         return "La contraseña debe tener al menos 8 caracteres.";
       }
 
       if (
         m.includes("expired") ||
-        (m.includes("invalid") && m.includes("token"))
+        (
+          m.includes("invalid") &&
+          m.includes("token")
+        )
       ) {
         return "El enlace de recuperación expiró. Solicita uno nuevo desde la app.";
       }
@@ -188,27 +266,48 @@
     }
 
     async function resetPassword() {
+      if (!sb) {
+        showStatus(
+          "err",
+          "No se pudo cargar Supabase JS (CDN). Revisa tu conexión e intenta nuevamente."
+        );
+        return;
+      }
+
       const originalText = btnEl.textContent;
+
       btnEl.disabled = true;
       btnEl.textContent = "Guardando…";
 
       try {
-        // Do NOT trim passwords (spaces can be valid characters)
-        const pw1 = document.getElementById("pw1").value;
-        const pw2 = document.getElementById("pw2").value;
+        // Do NOT trim passwords (spaces can be valid characters).
+        const pw1 =
+          document.getElementById("pw1").value;
+
+        const pw2 =
+          document.getElementById("pw2").value;
 
         if (!pw1 || !pw2) {
-          showStatus("err", "Por favor completa ambos campos.");
+          showStatus(
+            "err",
+            "Por favor completa ambos campos."
+          );
           return;
         }
 
         if (pw1.length < 8) {
-          showStatus("err", "La contraseña debe tener al menos 8 caracteres.");
+          showStatus(
+            "err",
+            "La contraseña debe tener al menos 8 caracteres."
+          );
           return;
         }
 
         if (pw1 !== pw2) {
-          showStatus("err", "Las contraseñas no coinciden.");
+          showStatus(
+            "err",
+            "Las contraseñas no coinciden."
+          );
           return;
         }
 
@@ -219,35 +318,49 @@
         // and browser history before updating the password.
         clearRecoveryCredentialsFromUrl();
 
-        const { error } = await sb.auth.updateUser({
-          password: pw1
-        });
+        const { error } =
+          await sb.auth.updateUser({
+            password: pw1
+          });
 
-        if (error) throw error;
+        if (error) {
+          throw error;
+        }
 
         showStatus(
           "ok",
           "✅ Contraseña actualizada. Ya puedes volver a la app e iniciar sesión."
         );
       } catch (err) {
-        showStatus("err", friendlySupabaseError(err));
+        showStatus(
+          "err",
+          friendlySupabaseError(err)
+        );
       } finally {
         btnEl.disabled = false;
         btnEl.textContent = originalText;
       }
     }
 
-    // Hook button without inline onclick
-    btnEl.addEventListener("click", resetPassword);
+    // Hook button without inline onclick.
+    btnEl.addEventListener(
+      "click",
+      resetPassword
+    );
 
-    // Optional: early hint if link type is wrong
+    // Optional: early hint if link type is wrong.
     (function () {
       const p = getParams();
 
-      if (p.type && p.type !== "recovery") {
+      if (
+        p.type &&
+        p.type !== "recovery"
+      ) {
         showStatus(
           "err",
-          "Este enlace no es de recuperación (type=" + p.type + ")."
+          "Este enlace no es de recuperación (type=" +
+            p.type +
+            ")."
         );
       }
     })();
